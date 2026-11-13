@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文件拆分合并工具</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f5f7fb;--card:#fff;--line:#e3e8f0;--txt:#1f2937;--sub:#6b7280;--pri:#2563eb;--pri-d:#1d4ed8;--ok:#16a34a;--warn:#d97706;--err:#dc2626;--r:12px}
+body{font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);line-height:1.6}
+.topbar{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--pri);color:#fff;display:grid;place-items:center;font-size:18px}
+.brand h1{font-size:18px;font-weight:700}
+.tabs{display:flex;gap:8px;background:var(--bg);padding:4px;border-radius:10px}
+.tab{border:0;background:transparent;padding:8px 18px;border-radius:8px;font-size:14px;cursor:pointer;color:var(--sub)}
+.tab.active{background:#fff;color:var(--pri);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+main{max-width:1080px;margin:0 auto;padding:20px}
+.panel{display:none}
+.panel.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:16px}
+.card h2{font-size:15px;margin-bottom:12px;color:#374151}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--sub)}
+input[type=text],input[type=number],select,textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;color:var(--txt);background:#fff;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+label.check{flex-direction:row;align-items:center;gap:8px;color:var(--txt);font-size:14px}
+label.check input{width:auto}
+.hint{margin-top:12px;font-size:12px;color:var(--sub)}
+.dropzone{border:2px dashed var(--line);border-radius:var(--r);padding:26px;text-align:center;color:var(--sub);font-size:14px;cursor:pointer;transition:.2s;background:#fafbfe}
+.dropzone:hover,.dropzone.over{border-color:var(--pri);color:var(--pri);background:#f0f6ff}
+textarea{min-height:150px;margin-top:12px;resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:#fff;padding:9px 16px;border-radius:8px;font-size:14px;cursor:pointer;color:var(--txt);transition:.15s}
+.btn:hover{border-color:var(--pri);color:var(--pri)}
+.btn.primary{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:600}
+.btn.primary:hover{background:var(--pri-d);color:#fff}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.empty{color:var(--sub);font-size:14px;text-align:center;padding:22px}
+.stat{font-size:13px;color:var(--sub);background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+.stat b{color:var(--txt)}
+.iterbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#f0f6ff;border:1px solid #dbeafe;border-radius:10px;padding:12px;margin-bottom:14px}
+.sub{font-size:13px;color:var(--sub)}
+.chunks{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:14px}
+.chunk{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fafbfe}
+.cmeta{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.cno{font-weight:700;color:var(--pri);font-family:ui-monospace,Consolas,monospace}
+.cprev{font-size:12px;color:var(--sub);background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-bottom:8px;word-break:break-all;min-height:34px;font-family:ui-monospace,Consolas,monospace}
+.copy-btn{width:100%}
+.msg{border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:8px;border:1px solid}
+.msg.err{border-color:#fecaca;background:#fef2f2;color:#b91c1c}
+.msg.warn{border-color:#fed7aa;background:#fffbeb;color:#b45309}
+.msg.ok{border-color:#bbf7d0;background:#f0fdf4;color:#15803d}
+#mergeOut{min-height:200px;font-family:ui-monospace,Consolas,monospace;font-size:13px}
+.hidden{display:none}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:var(--err)}
+.toast.ok{background:var(--ok)}
+footer{text-align:center;font-size:12px;color:var(--sub);padding:18px}
+@media(max-width:640px){.topbar{justify-content:center}.chunks{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">⇄</span><h1>文件拆分合并工具</h1></div>
+  <nav class="tabs">
+    <button class="tab active" data-tab="split">文件拆分</button>
+    <button class="tab" data-tab="merge">文件合并</button>
+  </nav>
+</header>
+<main>
+  <!-- 拆分 -->
+  <section id="panel-split" class="panel active">
+    <div class="card">
+      <h2>拆分设置</h2>
+      <div class="grid">
+        <label>拆分字符数<input id="splitSize" type="number" min="1" max="100000" value="300"></label>
+        <label>前缀（含三位序号）<input id="splitPrefix" type="text" value="start.001="></label>
+        <label>后缀（含三位序号）<input id="splitSuffix" type="text" value="=end.001="></label>
+        <label class="check"><input id="splitKeepLine" type="checkbox"> 尽量不切断整行</label>
+      </div>
+      <p class="hint">序号从 001 自动递增，超过 999 片自然进位为 4 位；拖入多个文件时按顺序拼接后统一拆分。</p>
+    </div>
+    <div class="card">
+      <h2>选择内容</h2>
+      <div id="splitZone" class="dropzone">拖拽文件到此处，或点击选择文件（支持多选）</div>
+      <input id="splitFile" type="file" multiple hidden>
+      <textarea id="splitText" placeholder="也可以直接粘贴或输入文本内容…"></textarea>
+    </div>
+    <div class="card">
+      <div class="row">
+        <button id="btnSplit" class="btn primary">开始拆分</button>
+        <button id="btnSplitClear" class="btn ghost">清空</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>拆分结果</h2>
+      <div id="splitResult"><div class="empty">暂无拆分结果</div></div>
+    </div>
+  </section>
+
+  <!-- 合并 -->
+  <section id="panel-merge" class="panel">
+    <div class="card">
+      <h2>合并设置</h2>
+      <div class="grid">
+        <label>前缀（含三位序号）<input id="mergePrefix" type="text" value="start.001="></label>
+        <label>后缀（含三位序号）<input id="mergeSuffix" type="text" value="=end.001="></label>
+        <label>片间分隔符
+          <select id="mergeSep"><option value="none">无分隔（原样拼接）</option><option value="nl">换行分隔</option></select>
+        </label>
+        <label class="check"><input id="mergeKeepWrap" type="checkbox"> 保留前后缀</label>
+      </div>
+      <p class="hint">「仅校验」只检查序号完整性与配对情况，不输出结果；序号错乱时会按序号重新排序后合并。</p>
+    </div>
+    <div class="card">
+      <h2>选择内容</h2>
+      <div id="mergeZone" class="dropzone">拖拽文件到此处，或点击选择文件（支持多选）</div>
+      <input id="mergeFile" type="file" multiple hidden>
+      <textarea id="mergeText" placeholder="粘贴含前后缀的片段内容，可乱序、可含多余文字…"></textarea>
+    </div>
+    <div class="card">
+      <div class="row">
+        <button id="btnValidate" class="btn">仅校验（不输出）</button>
+        <button id="btnMerge" class="btn primary">校验并合并</button>
+        <button id="btnMergeClear" class="btn ghost">清空</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>校验报告</h2>
+      <div id="mergeReport"><div class="empty">尚未校验</div></div>
+    </div>
+    <div class="card hidden" id="mergeResultCard">
+      <h2>合并结果</h2>
+      <textarea id="mergeOut" readonly></textarea>
+      <div class="row" style="margin-top:12px">
+        <button id="btnCopyMerged" class="btn primary">复制合并结果</button>
+        <button id="btnDlMerged" class="btn">下载 merged.txt</button>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>纯前端实现，文件仅在本地读取，不会上传到任何服务器。</footer>
+<div id="toast" class="toast" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const state={split:{chunks:[],text:''},merge:{report:null,result:''}};
+
+/* ===== 通用工具 ===== */
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function uniq(a){return Array.from(new Set(a));}
+function pad(n){return String(n).padStart(3,'0');}
+let toastTimer;
+function toast(msg,type){
+  const t=$('#toast');t.textContent=msg;t.className='toast show '+(type||'ok');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.className='toast';},2200);
+}
+async function copyText(text){
+  try{await navigator.clipboard.writeText(text);return true;}
+  catch(e){
+    const ta=document.createElement('textarea');ta.value=text;
+    ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+    let ok=false;try{ok=document.execCommand('copy');}catch(_){}
+    ta.remove();return ok;
+  }
+}
+// 下载：下一帧触发点击 + 延迟清理 + 多重兜底，返回是否成功
+function download(name,text){
+  if(text==null)text='';
+  try{
+    if(navigator.msSaveBlob){
+      navigator.msSaveBlob(new Blob([text],{type:'application/octet-stream'}),name);
+      return true;
+    }
+  }catch(_){}
+  try{
+    const blob=new Blob([text],{type:'application/octet-stream;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=name;a.rel='noopener';
+    a.style.cssText='position:fixed;left:-9999px;top:0';
+    document.body.appendChild(a);
+    requestAnimationFrame(()=>{
+      try{a.click();}catch(_){}
+      setTimeout(()=>{a.remove();URL.revokeObjectURL(url);},2000);
+    });
+    return true;
+  }catch(e){
+    try{
+      const a=document.createElement('a');
+      a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(text);
+      a.download=name;a.rel='noopener';
+      a.style.cssText='position:fixed;left:-9999px;top:0';
+      document.body.appendChild(a);
+      requestAnimationFrame(()=>{try{a.click();}catch(_){}setTimeout(()=>a.remove(),2000);});
+      return true;
+    }catch(_){return false;}
+  }
+}
+// 模板 -> 正则片段（首个数字段作为序号捕获组）
+function buildPattern(tpl){
+  const src0=String(tpl).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return {src:src0.replace(/\d+/,'(\\d{1,})'),hasNum:/\d/.test(src0)};
+}
+function renderTpl(tpl,no){return String(tpl).replace(/\d+/,pad(no));}
+
+/* ===== 输入：拖拽 / 选择 / 粘贴 ===== */
+function setupInput(p){
+  const zone=$('#'+p+'Zone'),fi=$('#'+p+'File'),ta=$('#'+p+'Text');
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('over');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('over'));
+  zone.addEventListener('drop',async e=>{e.preventDefault();zone.classList.remove('over');await loadFiles(e.dataTransfer.files,p);});
+  zone.addEventListener('click',()=>fi.click());
+  fi.addEventListener('change',()=>{loadFiles(fi.files,p);fi.value='';});
+  ta.addEventListener('paste',async e=>{
+    const f=e.clipboardData&&e.clipboardData.files;
+    if(f&&f.length){e.preventDefault();await loadFiles(f,p);}
+  });
+}
+async function loadFiles(files,p){
+  if(!files||!files.length)return;
+  const arr=Array.from(files);let text='';
+  for(const f of arr){text+=(await f.text())+'\n';}
+  text=text.replace(/\r\n/g,'\n').replace(/\n$/,'');
+  $('#'+p+'Text').value=text;
+  toast('已载入 '+arr.length+' 个文件，共 '+text.length+' 字符');
+}
+function readText(p){return $('#'+p+'Text').value.replace(/\r\n/g,'\n').replace(/[\u200b-\u200d\ufeff]/g,'');}
+
+/* ===== 拆分 ===== */
+function splitText(text,size,keepLine,preTpl,sufTpl){
+  const out=[];let i=0,no=1;const len=text.length;
+  size=Math.max(1,Math.min(100000,size|0));
+  while(i<len){
+    let end=Math.min(i+size,len);
+    if(keepLine&&end<len){const nl=text.lastIndexOf('\n',end-1);if(nl>i)end=nl+1;}
+    const body=text.slice(i,end);
+    const prefix=renderTpl(preTpl,no),suffix=renderTpl(sufTpl,no);
+    out.push({no,body,full:prefix+body+suffix});
+    i=end;no++;
+  }
+  return out;
+}
+function renderSplit(){
+  const {chunks,text}=state.split,wrap=$('#splitResult');
+  if(!chunks.length){wrap.innerHTML='<div class="empty">暂无拆分结果</div>';return;}
+  let h='<div class="stat">原始字符数 <b>'+text.length+'</b> · 分片数 <b>'+chunks.length+'</b> · 序号 <b>'+pad(chunks[0].no)+' ~ '+pad(chunks[chunks.length-1].no)+'</b></div>';
+  h+='<div class="iterbar"><button id="iterBtn" class="btn primary"></button><span id="iterProgress" class="sub"></span><button id="iterReset" class="btn ghost">重置迭代</button></div>';
+  h+='<div class="chunks">';
+  chunks.forEach((c,i)=>{
+    h+='<div class="chunk"><div class="cmeta"><span class="cno">'+pad(c.no)+'</span><span class="sub">'+c.body.length+' 字符</span></div>'
+      +'<div class="cprev">'+esc(c.body.slice(0,80))+(c.body.length>80?'…':'')+'</div>'
+      +'<button class="btn copy-btn" data-i="'+i+'">复制 '+pad(c.no)+'</button></div>';
+  });
+  h+='</div><div class="row"><button id="copyAll" class="btn">复制全部（空行分隔）</button><button id="dlAll" class="btn">下载分片 .txt</button></div>';
+  wrap.innerHTML=h;bindSplitResult();
+}
+function bindSplitResult(){
+  const chunks=state.split.chunks;let idx=0;
+  const btn=$('#iterBtn'),prog=$('#iterProgress');
+  function upd(){
+    if(idx>=chunks.length){btn.textContent='全部已复制 ✓';btn.disabled=true;}
+    else{btn.textContent='复制 '+pad(chunks[idx].no);btn.disabled=false;}
+    prog.textContent='已复制 '+Math.min(idx,chunks.length)+' / '+chunks.length;
+  }
+  btn.onclick=async()=>{
+    if(idx>=chunks.length)return;
+    const ok=await copyText(chunks[idx].full);
+    toast(ok?'已复制 '+pad(chunks[idx].no):'复制失败',ok?'ok':'err');
+    idx++;upd();
+  };
+  $('#iterReset').onclick=()=>{idx=0;upd();};
+  upd();
+  $$('.copy-btn').forEach(b=>{b.onclick=async()=>{
+    const c=chunks[+b.dataset.i],ok=await copyText(c.full);
+    toast(ok?'已复制 '+pad(c.no):'复制失败',ok?'ok':'err');
+  };});
+  $('#copyAll').onclick=async()=>{const ok=await copyText(chunks.map(c=>c.full).join('\n\n'));toast(ok?'已复制全部分片':'复制失败',ok?'ok':'err');};
+  $('#dlAll').onclick=()=>{
+    const ok=download('chunks.txt',chunks.map(c=>c.full).join('\n\n'));
+    toast(ok?'已开始下载 chunks.txt':'当前环境不支持下载，请改用复制','ok');
+  };
+}
+
+/* ===== 合并：提取 + 校验 ===== */
+function analyze(text,preTpl,sufTpl){
+  const R={errors:[],warnings:[],infos:[],chunks:[],stats:null};
+  const p=buildPattern(preTpl),s=buildPattern(sufTpl);
+  if(!p.hasNum||!s.hasNum){R.errors.push('前缀和后缀模板都必须包含数字序号（例如 001），否则无法定位片段。');return R;}
+  const suffixBack=s.src.replace('(\\d{1,})','\\1');
+  const pairRe=new RegExp(p.src+'([\\s\\S]*?)'+suffixBack,'g');
+  const preRe=new RegExp(p.src,'g'),sufRe=new RegExp(s.src,'g');
+  let m;const preNums=[],sufNums=[];
+  while((m=preRe.exec(text)))preNums.push(m[1]);
+  while((m=sufRe.exec(text)))sufNums.push(m[1]);
+  while((m=pairRe.exec(text)))R.chunks.push({no:m[1],body:m[2],raw:m[0]});
+  if(!R.chunks.length){
+    R.errors.push('未找到任何「前缀 + 内容 + 后缀」完整配对的片段，请检查前缀/后缀设置或输入内容。');
+    return R;
+  }
+  const setP=new Set(preNums),setS=new Set(sufNums);
+  const missSuf=uniq(preNums.filter(n=>!setS.has(n)));
+  const missPre=uniq(sufNums.filter(n=>!setP.has(n)));
+  if(missSuf.length)R.errors.push('以下序号有前缀但缺少对应后缀（前后缀序号不匹配）：'+missSuf.slice(0,20).join('、'));
+  if(missPre.length)R.errors.push('以下序号有后缀但缺少对应前缀：'+missPre.slice(0,20).join('、'));
+  const dup=uniq(preNums.filter((n,i,a)=>a.indexOf(n)!==i));
+  if(dup.length)R.warnings.push('存在重复序号：'+dup.slice(0,20).join('、')+'（全部片段都会保留）');
+  const nums=R.chunks.map(c=>Number(c.no)).filter(Number.isFinite);
+  const min=Math.min.apply(null,nums),max=Math.max.apply(null,nums);
+  const missing=[];for(let n=min;n<=max;n++)if(nums.indexOf(n)<0)missing.push(pad(n));
+  if(missing.length)R.warnings.push('序号不连续，缺失 '+missing.length+' 个：'+missing.slice(0,20).join('、')+(missing.length>20?' …':''));
+  let disorder=false;for(let i=1;i<nums.length;i++)if(nums[i]<nums[i-1]){disorder=true;break;}
+  if(disorder)R.warnings.push('检测到序号顺序错乱，合并时将按序号重新排序。');
+  R.stats={count:R.chunks.length,min,max,missing:missing.length,chars:R.chunks.reduce((a,c)=>a+c.body.length,0),disorder};
+  if(!R.errors.length&&!R.warnings.length)R.infos.push('校验通过：序号完整、配对齐全且顺序正确。');
+  return R;
+}
+function renderReport(R){
+  let h='';
+  if(R.stats)h+='<div class="stat">片段 <b>'+R.stats.count+'</b> · 序号范围 <b>'+pad(R.stats.min)+'~'+pad(R.stats.max)+'</b> · 缺失 <b>'+R.stats.missing+'</b> · 净字符 <b>'+R.stats.chars+'</b></div>';
+  R.errors.forEach(e=>h+='<div class="msg err">✗ '+esc(e)+'</div>');
+  R.warnings.forEach(w=>h+='<div class="msg warn">⚠ '+esc(w)+'</div>');
+  R.infos.forEach(i=>h+='<div class="msg ok">✓ '+esc(i)+'</div>');
+  $('#mergeReport').innerHTML=h||'<div class="empty">无报告</div>';
+}
+function doMerge(R,keepWrap,sep){
+  return R.chunks.slice().sort((a,b)=>Number(a.no)-Number(b.no))
+                 .map(c=>keepWrap?c.raw:c.body).join(sep);
+}
+// 同步合并结果区与按钮状态
+function syncMergeResult(){
+  const has=!!state.merge.result;
+  $('#mergeResultCard').classList.toggle('hidden',!has);
+  $('#btnDlMerged').disabled=!has;
+  $('#btnCopyMerged').disabled=!has;
+}
+
+/* ===== 事件绑定 ===== */
+function switchTab(name){
+  state.tab=name;
+  $$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  $$('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+name));
+}
+$$('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
+
+$('#btnSplit').onclick=()=>{
+  const text=readText('split');
+  if(!text.trim()){toast('请输入或选择要拆分的内容','err');return;}
+  const size=parseInt($('#splitSize').value,10)||300;
+  const pre=$('#splitPrefix').value,suf=$('#splitSuffix').value;
+  if(!/\d/.test(pre)||!/\d/.test(suf)){toast('前缀和后缀都必须包含数字序号','err');return;}
+  state.split.text=text;
+  state.split.chunks=splitText(text,size,$('#splitKeepLine').checked,pre,suf);
+  renderSplit();
+  toast('拆分完成，共 '+state.split.chunks.length+' 片');
+};
+$('#btnSplitClear').onclick=()=>{
+  $('#splitText').value='';state.split={chunks:[],text:''};renderSplit();
+};
+
+function runAnalyze(){
+  const text=readText('merge');
+  if(!text.trim()){toast('请输入或选择要合并的内容','err');return null;}
+  return analyze(text,$('#mergePrefix').value,$('#mergeSuffix').value);
+}
+$('#btnValidate').onclick=()=>{
+  const R=runAnalyze();if(!R)return;
+  state.merge.report=R;renderReport(R);
+  state.merge.result='';syncMergeResult();
+  toast(R.errors.length?'校验未通过：存在错误':'校验完成（未输出合并结果）',R.errors.length?'err':'ok');
+};
+$('#btnMerge').onclick=()=>{
+  const R=runAnalyze();if(!R)return;
+  state.merge.report=R;renderReport(R);
+  if(R.errors.length){state.merge.result='';syncMergeResult();toast('存在错误，已阻止合并','err');return;}
+  const text=doMerge(R,$('#mergeKeepWrap').checked,$('#mergeSep').value==='nl'?'\n':'');
+  state.merge.result=text;$('#mergeOut').value=text;
+  syncMergeResult();
+  toast(R.stats&&R.stats.disorder?'已按序号重排并合并完成':'合并完成','ok');
+};
+$('#btnMergeClear').onclick=()=>{
+  $('#mergeText').value='';$('#mergeReport').innerHTML='<div class="empty">尚未校验</div>';
+  state.merge={report:null,result:''};syncMergeResult();
+};
+$('#btnCopyMerged').onclick=async()=>{
+  if(!state.merge.result){toast('暂无合并结果','err');return;}
+  const ok=await copyText(state.merge.result);toast(ok?'已复制合并结果':'复制失败',ok?'ok':'err');
+};
+$('#btnDlMerged').onclick=async()=>{
+  if(!state.merge.result){
+    toast('暂无合并结果，请先点击「校验并合并」','err');
+    return;
+  }
+  const ok=download('merged.txt',state.merge.result);
+  if(ok){
+    toast('已开始下载 merged.txt');
+  }else{
+    const copied=await copyText(state.merge.result);
+    toast(copied?'当前环境禁止下载，已改为复制到剪贴板，请手动粘贴保存':'下载与复制均失败，请检查浏览器权限','err');
+  }
+};
+
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){
+    e.preventDefault();
+    (state.tab==='split'?$('#btnSplit'):$('#btnMerge')).click();
+  }
+});
+
+setupInput('split');setupInput('merge');renderSplit();syncMergeResult();
+})();
+</script>
+</body>
+</html>
